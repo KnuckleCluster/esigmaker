@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SR Esignature Creator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Ace Editor for syntax highlighting -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.2/ace.js"></script>
+<style>
+:root {
+  --ink: #0F1A2E;
+  --muted: #5B6678;
+  --faint: #8A94A6;
+  --line: #DCE1EA;
+  --canvas: #EEF1F6;
+  --surface: #FFFFFF;
+  --accent: #2E5BFF;
+  --accent-dark: #1B3FD1;
+  --danger: #B42318;
+  --danger-bg: #FEF3F2;
+  --danger-line: #FDA29B;
+  --display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+  --body: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color-scheme: light;
+}
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font: 400 15px/1.5 var(--body);
+}
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- Top bar ---------- */
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.topbar-inner {
+  max-width: 1320px; margin: 0 auto; padding: 0 24px;
+  height: 60px; display: flex; align-items: center; gap: 12px;
+}
+.topbar h1 { margin: 0; font: 700 18px/1 var(--display); letter-spacing: -0.01em; }
+
+/* ---------- Layout ---------- */
+.layout {
+  max-width: 1320px; margin: 0 auto; padding: 24px;
+  display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: 24px; align-items: stretch;
+}
+.panel {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+}
+.form-panel { padding: 24px; display: flex; flex-direction: column; }
+.form-panel form { flex: 1; display: flex; flex-direction: column; }
+.form-panel h2 { margin: 0; font: 700 22px/1.2 var(--display); letter-spacing: -0.01em; }
+.lede { margin: 4px 0 20px; color: var(--muted); font-size: 14px; }
+
+/* ---------- Type picker ---------- */
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+legend { padding: 0; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+.type-row { display: grid; grid-template-columns: 28px 1fr; gap: 8px; align-items: center; }
+.type-row + .type-row { margin-top: 8px; }
+.type-region { font-size: 13px; font-weight: 600; color: var(--faint); }
+.chips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.chip { position: relative; }
+.chip input { position: absolute; opacity: 0; inset: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+.chip span {
+  display: block; text-align: center; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--surface); font-size: 14px; font-weight: 500; transition: background .15s, border-color .15s, color .15s;
+}
+.chip:hover span { border-color: #AAB3C2; }
+.chip input:checked + span { background: var(--ink); border-color: var(--ink); color: #fff; }
+.chip input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- Fields ---------- */
+.fields { margin-top: 20px; display: grid; gap: 16px; }
+.field label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.field .opt { color: var(--faint); font-weight: 400; }
+.field input[type="text"], .field input[type="url"], .field input[type="email"], .field input[type="tel"] {
+  width: 100%; height: 42px; padding: 0 12px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px; outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.field input::placeholder { color: #A3ACBB; }
+.field input:hover { border-color: #AAB3C2; }
+.field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(46, 91, 255, .18); }
+.field input.invalid { border-color: var(--danger); }
+.field input.invalid:focus { box-shadow: 0 0 0 3px rgba(180, 35, 24, .16); }
+.help { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+.err { margin: 6px 0 0; font-size: 13px; color: var(--danger); }
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 36px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--surface); font-size: 14px; font-weight: 600; white-space: nowrap;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.btn:hover:not(:disabled) { background: #F5F7FA; border-color: #AAB3C2; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn svg { width: 16px; height: 16px; flex: none; }
+.btn-ink { background: var(--ink); border-color: var(--ink); color: #fff; }
+.btn-ink:hover:not(:disabled) { background: #1E2D4A; border-color: #1E2D4A; }
+.btn-accent { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-accent:hover:not(:disabled) { background: var(--accent-dark); border-color: var(--accent-dark); }
+.btn-danger { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn-danger:hover:not(:disabled) { background: #912018; border-color: #912018; }
+.btn-lg { height: 44px; width: 100%; font-size: 15px; }
+.btn-text { border-color: transparent; background: transparent; color: var(--muted); }
+.btn-text:hover:not(:disabled) { background: #F0F2F6; border-color: transparent; color: var(--ink); }
+
+.form-actions { margin-top: auto; padding-top: 24px; }
+.form-actions-row { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; gap: 8px; }
+.kbd-hint { font-size: 13px; color: var(--faint); }
+.spinner {
+  width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ---------- Stage ---------- */
+.stage-panel { overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.stage-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 0 16px; border-bottom: 1px solid var(--line);
+}
+.tabs { display: flex; gap: 4px; }
+.tab {
+  position: relative; height: 52px; padding: 0 12px; border: 0; background: transparent;
+  font-size: 14px; font-weight: 600; color: var(--muted);
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.tab:hover:not(:disabled) { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--ink); }
+.tab[aria-selected="true"]::after {
+  content: ""; position: absolute; left: 8px; right: 8px; bottom: -1px; height: 2px; background: var(--ink); border-radius: 2px;
+}
+.tab:disabled { opacity: .45; cursor: not-allowed; }
+.dirty-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.head-tools { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 8px 0; }
+
+.switch { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; cursor: pointer; user-select: none; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch .track { width: 32px; height: 18px; border-radius: 999px; background: #C5CCD8; position: relative; transition: background .15s; }
+.switch .track::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff;
+  transition: transform .15s;
+}
+.switch input:checked + .track { background: var(--ink); }
+.switch input:checked + .track::after { transform: translateX(14px); }
+.switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.segmented { display: inline-flex; padding: 2px; background: #EEF1F6; border-radius: 8px; }
+.segmented button { border: 0; background: transparent; height: 28px; padding: 0 12px; border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.segmented button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(15, 26, 46, .12); }
+
+.banner {
+  display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px;
+  background: var(--danger-bg); border-bottom: 1px solid var(--danger-line); color: #7A271A; font-size: 14px;
+}
+.banner svg { width: 18px; height: 18px; flex: none; margin-top: 2px; color: var(--danger); }
+.banner p { margin: 0; flex: 1; }
+.banner .btn { height: 30px; font-size: 13px; }
+
+.stage-body { position: relative; min-height: 520px; flex: 1; display: flex; flex-direction: column; }
+.canvas {
+  flex: 1; min-height: 520px; padding: 32px 24px; display: flex; justify-content: center; align-items: flex-start;
+  background-color: #F6F8FB;
+  background-image: radial-gradient(#CBD2DE 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+.device { width: 100%; max-width: 720px; transition: max-width .25s ease; }
+.device[data-device="mobile"] { max-width: 375px; }
+
+.mail {
+  background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(15, 26, 46, .06), 0 12px 28px -14px rgba(15, 26, 46, .22);
+}
+.mail-head { padding: 12px 20px; border-bottom: 1px solid var(--line); display: grid; gap: 4px; font-size: 14px; }
+.mail-head div { display: flex; gap: 12px; }
+.mail-head dt { width: 56px; color: var(--faint); font-size: 13px; }
+.mail-head dd { margin: 0; }
+.mail-head dl { margin: 0; display: grid; gap: 4px; }
+.mail-body { padding: 20px; font: 400 14px/1.55 Arial, 'Segoe UI', sans-serif; color: #222; }
+.mail-body p { margin: 0 0 12px; }
+.device[data-context="off"] .mail-head,
+.device[data-context="off"] .ctx { display: none; }
+.device[data-context="off"] .mail-body { padding: 16px 20px; }
+
+.sig-slot { position: relative; min-height: 120px; }
+.sig-empty {
+  border: 1.5px dashed #C5CCD8; border-radius: 8px; padding: 28px 20px; text-align: center; color: var(--muted); font-family: var(--body);
+}
+.sig-empty strong { display: block; color: var(--ink); font-weight: 600; font-size: 15px; margin-bottom: 2px; }
+.sig-empty span { font-size: 13px; }
+.sig-loading { display: grid; gap: 10px; padding: 4px 0; }
+.sig-loading i {
+  display: block; height: 12px; border-radius: 6px;
+  background: linear-gradient(90deg, #E7EBF2 25%, #F3F5F9 50%, #E7EBF2 75%); background-size: 200% 100%;
+  animation: shimmer 1.3s linear infinite;
+}
+.sig-loading i:nth-child(1) { width: 38%; height: 16px; }
+.sig-loading i:nth-child(2) { width: 52%; }
+.sig-loading i:nth-child(3) { width: 44%; }
+.sig-loading i:nth-child(4) { width: 30%; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+#sigFrame { display: block; width: 100%; height: 120px; border: 0; background: transparent; transition: opacity .2s; }
+.stage-panel[data-busy="true"] #sigFrame { opacity: .35; }
+
+.code-wrap { position: relative; flex: 1; min-height: 520px; background: #282c34; }
+#codeEditor { position: absolute; inset: 0; }
+
+.stage-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 12px 16px; border-top: 1px solid var(--line); background: #FAFBFD;
+}
+.filename { display: flex; align-items: center; height: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); min-width: 0; }
+.filename:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(46, 91, 255, .18); }
+.filename input { border: 0; outline: none; background: transparent; height: 100%; padding: 0 0 0 12px; width: 220px; min-width: 0; font-size: 14px; }
+.filename span { padding: 0 12px 0 2px; color: var(--faint); font-size: 14px; }
+.foot-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.foot-note { flex-basis: 100%; margin: 0; font-size: 13px; color: var(--muted); }
+
+/* ---------- Dialog & toast ---------- */
+dialog { border: 0; border-radius: 14px; padding: 24px; width: min(420px, 92vw); color: var(--ink); box-shadow: 0 24px 60px -12px rgba(15, 26, 46, .4); }
+dialog::backdrop { background: rgba(15, 26, 46, .45); backdrop-filter: blur(2px); }
+dialog h3 { margin: 0 0 6px; font: 700 19px/1.25 var(--display); }
+dialog p { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+dialog[open] { animation: pop .16s ease-out; }
+@keyframes pop { from { transform: translateY(6px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 16px); opacity: 0; pointer-events: none;
+  background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 14px; font-weight: 500;
+  max-width: calc(100vw - 32px); transition: opacity .2s, transform .2s; z-index: 100;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 960px) {
+  .layout { grid-template-columns: 1fr; padding: 16px; }
+  .form-panel { padding: 20px; }
+  .canvas { padding: 20px 12px; }
+}
+@media (max-width: 560px) {
+  .filename { flex: 1 1 100%; }
+  .filename input { width: 100%; }
+  .foot-actions { width: 100%; }
+  .foot-actions .btn { flex: 1 1 auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001s !important; animation-iteration-count: 1 !important; transition-duration: .001s !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-inner">
+    <svg width="30" height="30" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <circle cx="16" cy="16" r="9" fill="#0F1A2E"/>
+      <ellipse cx="16" cy="16" rx="14" ry="5.5" transform="rotate(-24 16 16)" stroke="#2E5BFF" stroke-width="2.2"/>
+    </svg>
+    <h1>SR Esignature Creator</h1>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- ===== Form ===== -->
+  <section class="panel form-panel" aria-labelledby="formTitle">
+    <h2 id="formTitle">Signature details</h2>
+    <p class="lede">Pick a type, fill in the details, then generate.</p>
+
+    <form id="signatureForm" novalidate>
+      <fieldset>
+        <legend>Signature type</legend>
+        <div class="type-row">
+          <span class="type-region">US</span>
+          <div class="chips">
+            <label class="chip"><input type="radio" name="type" value="US - Full" checked><span>Full</span></label>
+            <label class="chip"><input type="radio" name="type" value="US - Calendly only"><span>Calendly only</span></label>
+            <label class="chip"><input type="radio" name="type" value="US - Phone only"><span>Phone only</span></label>
+            <label class="chip"><input type="radio" name="type" value="US - No Extra"><span>No extra</span></label>
+          </div>
+        </div>
+        <div class="type-row">
+          <span class="type-region">PH</span>
+          <div class="chips">
+            <label class="chip"><input type="radio" name="type" value="PH - Default"><span>Default</span></label>
+            <label class="chip"><input type="radio" name="type" value="PH - FUB"><span>FUB</span></label>
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="fields">
+        <div class="field">
+          <label for="name">Name</label>
+          <input type="text" id="name" name="name" placeholder="Maria Santos" autocomplete="off" aria-describedby="err-name">
+          <p class="err" id="err-name" hidden></p>
+        </div>
+        <div class="field">
+          <label for="position">Position</label>
+          <input type="text" id="position" name="position" placeholder="Executive Assistant" autocomplete="off" aria-describedby="err-position">
+          <p class="err" id="err-position" hidden></p>
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" placeholder="maria@company.com" autocomplete="off" aria-describedby="err-email">
+          <p class="err" id="err-email" hidden></p>
+        </div>
+        <div class="field">
+          <label for="image">Image link</label>
+          <input type="url" id="image" name="image" placeholder="https://drive.google.com/..." autocomplete="off" aria-describedby="help-image err-image">
+          <p class="help" id="help-image">A direct image link or a Google Drive link.</p>
+          <p class="err" id="err-image" hidden></p>
+        </div>
+        <div class="field">
+          <label for="calendly">Calendly link <span class="opt">(optional)</span></label>
+          <input type="url" id="calendly" name="calendly" placeholder="https://calendly.com/..." autocomplete="off" aria-describedby="err-calendly">
+          <p class="err" id="err-calendly" hidden></p>
+        </div>
+        <div class="field">
+          <label for="phone">Phone <span class="opt">(optional)</span></label>
+          <input type="tel" id="phone" name="phone" placeholder="+1 555 123 4567" autocomplete="off" aria-describedby="err-phone">
+          <p class="err" id="err-phone" hidden></p>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" id="submitBtn" class="btn btn-accent btn-lg">
+          <span class="spinner" id="submitSpinner" hidden></span>
+          <span id="submitLabel">Generate signature</span>
+        </button>
+        <div class="form-actions-row">
+          <span class="kbd-hint" id="kbdHint">Ctrl + Enter to generate</span>
+          <span>
+            <button type="button" id="cancelRequestBtn" class="btn btn-text" hidden>Cancel request</button>
+            <button type="button" id="resetBtn" class="btn btn-text">Clear form</button>
+          </span>
+        </div>
+      </div>
+    </form>
+  </section>
+
+  <!-- ===== Output ===== -->
+  <section class="panel stage-panel" id="stagePanel" aria-label="Signature output" data-busy="false">
+
+    <div class="stage-head">
+      <div class="tabs" role="tablist" aria-label="Output view">
+        <button class="tab" role="tab" id="tabPreview" aria-selected="true" aria-controls="panePreview">Preview</button>
+        <button class="tab" role="tab" id="tabCode" aria-selected="false" aria-controls="paneCode" tabindex="-1" disabled>
+          Code <span class="dirty-dot" id="dirtyDot" hidden><span class="sr-only">Unapplied edits</span></span>
+        </button>
+      </div>
+
+      <div class="head-tools" id="previewTools">
+        <label class="switch">
+          <input type="checkbox" id="contextToggle" role="switch" checked>
+          <span class="track" aria-hidden="true"></span>
+          Show in email
+        </label>
+        <div class="segmented" role="group" aria-label="Preview width">
+          <button type="button" data-device="desktop" aria-pressed="true">Desktop</button>
+          <button type="button" data-device="mobile" aria-pressed="false">Mobile</button>
+        </div>
+      </div>
+
+      <div class="head-tools" id="codeTools" hidden>
+        <button type="button" id="discardBtn" class="btn" disabled>Discard edits</button>
+        <button type="button" id="applyBtn" class="btn btn-accent" disabled>Apply edits</button>
+      </div>
+    </div>
+
+    <div class="banner" id="errorMessage" role="alert" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v4m0 4h.01"/></svg>
+      <p id="errorText"></p>
+      <button type="button" class="btn" id="retryBtn">Try again</button>
+    </div>
+
+    <div class="stage-body">
+      <!-- Preview pane -->
+      <div id="panePreview" role="tabpanel" aria-labelledby="tabPreview" class="canvas">
+        <div class="device" id="device" data-device="desktop" data-context="on">
+          <div class="mail">
+            <div class="mail-head">
+              <dl>
+                <div><dt>To</dt><dd>jordan@client.com</dd></div>
+                <div><dt>Subject</dt><dd>Following up on our call</dd></div>
+              </dl>
+            </div>
+            <div class="mail-body">
+              <div class="ctx">
+                <p>Hi Jordan,</p>
+                <p>Thanks for the quick call today. I'll send over the summary by end of day.</p>
+                <p>Best,</p>
+              </div>
+              <div class="sig-slot">
+                <div class="sig-empty" id="sigEmpty">
+                  <strong>Your signature will appear here</strong>
+                  <span>Fill in the details and select Generate signature.</span>
+                </div>
+                <div class="sig-loading" id="sigLoading" hidden aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+                <iframe id="sigFrame" title="Signature preview" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" hidden></iframe>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Code pane -->
+      <div id="paneCode" role="tabpanel" aria-labelledby="tabCode" class="code-wrap" hidden>
+        <div id="codeEditor"></div>
+      </div>
+    </div>
+
+    <div class="stage-foot">
+      <div class="filename">
+        <input type="text" id="customFileName" placeholder="signature_generated" aria-label="File name" autocomplete="off">
+        <span>.html</span>
+      </div>
+      <div class="foot-actions">
+        <button type="button" class="btn" id="copySigBtn" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 012-2h9"/></svg>
+          Copy signature
+        </button>
+        <button type="button" class="btn" id="copyHtmlBtn" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 8l-4 4 4 4M15 8l4 4-4 4"/></svg>
+          Copy HTML
+        </button>
+        <button type="button" class="btn btn-ink" id="downloadBtn" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14"/></svg>
+          Download
+        </button>
+      </div>
+      <p class="foot-note" id="footNote" hidden>You have unapplied code edits. Copy and download use the last applied version.</p>
+    </div>
+  </section>
+</main>
+
+<!-- Confirm dialog -->
+<dialog id="confirmDialog" aria-labelledby="dlgTitle" aria-describedby="dlgText">
+  <h3 id="dlgTitle">Confirm</h3>
+  <p id="dlgText"></p>
+  <div class="dialog-actions">
+    <button type="button" class="btn" id="dlgNo">Keep editing</button>
+    <button type="button" class="btn btn-accent" id="dlgYes">Confirm</button>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* =====================================================================
+   Webhook + data flow (unchanged from v2):
+   form fields -> JSON POST -> n8n webhook -> HTML text response -> render
+   ===================================================================== */
+const WEBHOOK_URL = 'https://either-stoop-ogle.ngrok-free.dev/webhook/d1d94e48-3788-4315-a8c2-a16cc919975d';
+
+const $ = (id) => document.getElementById(id);
+
+/* ---------- State ---------- */
+let currentHtml = '';      // last applied HTML (what preview / copy / download use)
+let hasResult = false;
+let edited = false;        // applied manual edits since last generation
+let requestController = null;
+
+/* ---------- Elements ---------- */
+const form = $('signatureForm');
+const submitBtn = $('submitBtn'), submitSpinner = $('submitSpinner'), submitLabel = $('submitLabel');
+const cancelRequestBtn = $('cancelRequestBtn'), resetBtn = $('resetBtn');
+const stagePanel = $('stagePanel');
+const errorMsg = $('errorMessage'), errorText = $('errorText'), retryBtn = $('retryBtn');
+const tabPreview = $('tabPreview'), tabCode = $('tabCode');
+const panePreview = $('panePreview'), paneCode = $('paneCode');
+const previewTools = $('previewTools'), codeTools = $('codeTools');
+const device = $('device'), contextToggle = $('contextToggle');
+const sigEmpty = $('sigEmpty'), sigLoading = $('sigLoading'), sigFrame = $('sigFrame');
+const applyBtn = $('applyBtn'), discardBtn = $('discardBtn');
+const dirtyDot = $('dirtyDot'), footNote = $('footNote');
+const copySigBtn = $('copySigBtn'), copyHtmlBtn = $('copyHtmlBtn'), downloadBtn = $('downloadBtn');
+const customFileNameInput = $('customFileName');
+const dlg = $('confirmDialog'), dlgTitle = $('dlgTitle'), dlgText = $('dlgText'), dlgYes = $('dlgYes'), dlgNo = $('dlgNo');
+
+/* ---------- Code editor ---------- */
+const editor = ace.edit('codeEditor');
+editor.setTheme('ace/theme/one_dark');
+editor.session.setMode('ace/mode/html');
+editor.setOptions({
+  fontSize: '13px',
+  fontFamily: "ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace",
+  showPrintMargin: false,
+  wrap: true,
+  useWorker: false,
+  tabSize: 2
+});
+editor.renderer.setScrollMargin(12, 12);
+editor.on('change', updateDirty);
+
+/* ---------- Helpers ---------- */
+let toastTimer;
+function toast(message) {
+  const el = $('toast');
+  el.textContent = message;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+function isDirty() { return hasResult && editor.getValue() !== currentHtml; }
+function hasUnsaved() { return hasResult && (isDirty() || edited); }
+
+function updateDirty() {
+  const dirty = isDirty();
+  dirtyDot.hidden = !dirty;
+  footNote.hidden = !dirty;
+  applyBtn.disabled = !dirty;
+  discardBtn.disabled = !dirty;
+}
+
+/* ---------- Confirm dialog ---------- */
+let pendingAction = null;
+function confirmAction({ title, text, yes, no = 'Cancel', danger = false }, onConfirm) {
+  dlgTitle.textContent = title;
+  dlgText.textContent = text;
+  dlgYes.textContent = yes;
+  dlgNo.textContent = no;
+  dlgYes.className = 'btn ' + (danger ? 'btn-danger' : 'btn-accent');
+  pendingAction = onConfirm;
+  dlg.showModal();
+}
+dlgYes.addEventListener('click', () => { const fn = pendingAction; pendingAction = null; dlg.close(); if (fn) fn(); });
+dlgNo.addEventListener('click', () => { pendingAction = null; dlg.close(); });
+dlg.addEventListener('click', (e) => { if (e.target === dlg) { pendingAction = null; dlg.close(); } });
+dlg.addEventListener('cancel', () => { pendingAction = null; });
+
+/* ---------- Validation ---------- */
+const isUrl = (v) => { try { const u = new URL(v); return u.protocol === 'http:' || u.protocol === 'https:'; } catch { return false; } };
+const rules = {
+  name:     (v) => v ? '' : "Enter the person's name.",
+  position: (v) => v ? '' : 'Enter a job title.',
+  email:    (v) => !v ? 'Enter an email address.' : (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? '' : 'Enter a valid email, like name@company.com.'),
+  image:    (v) => !v ? 'Enter a link to the image.' : (isUrl(v) ? '' : 'Enter a full link that starts with https://'),
+  calendly: (v) => (!v || isUrl(v)) ? '' : 'Enter a full link that starts with https://',
+  phone:    (v) => (!v || (/^[\d\s()+\-.x#]+$/i.test(v) && v.replace(/\D/g, '').length >= 7)) ? '' : 'Enter a valid phone number.'
+};
+const touched = {};
+
+function setFieldError(key, message) {
+  const input = $(key), err = $('err-' + key);
+  input.classList.toggle('invalid', !!message);
+  input.setAttribute('aria-invalid', message ? 'true' : 'false');
+  err.textContent = message;
+  err.hidden = !message;
+}
+function validateField(key) {
+  const message = rules[key]($(key).value.trim());
+  setFieldError(key, message);
+  return !message;
+}
+function validateAll() {
+  let firstInvalid = null;
+  for (const key of Object.keys(rules)) {
+    touched[key] = true;
+    if (!validateField(key) && !firstInvalid) firstInvalid = $(key);
+  }
+  if (firstInvalid) firstInvalid.focus();
+  return !firstInvalid;
+}
+for (const key of Object.keys(rules)) {
+  $(key).addEventListener('blur', () => { touched[key] = true; validateField(key); });
+  $(key).addEventListener('input', () => { if (touched[key]) validateField(key); });
+}
+
+/* ---------- Busy / error state ---------- */
+function setBusy(busy) {
+  stagePanel.dataset.busy = busy;
+  submitBtn.disabled = busy;
+  submitSpinner.hidden = !busy;
+  submitLabel.textContent = busy ? 'Generating…' : 'Generate signature';
+  cancelRequestBtn.hidden = !busy;
+  resetBtn.hidden = busy;
+  sigLoading.hidden = !(busy && !hasResult);
+  sigEmpty.hidden = busy || hasResult;
+}
+function showError(message) { errorText.textContent = message; errorMsg.hidden = false; }
+function hideError() { errorMsg.hidden = true; }
+
+/* ---------- Preview rendering ---------- */
+function buildSrcdoc(html) {
+  const LT = '<';
+  const base = '<base target="_blank">';
+  if (/<html[\s>]/i.test(html)) {
+    return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + base) : base + html;
+  }
+  return '<!doctype html><html><head><meta charset="utf-8">' + base +
+    '<style>html,body{margin:0;padding:0}' + LT + '/style>' + LT + '/head><body>' + html +
+    LT + '/body>' + LT + '/html>';
+}
+function renderSignature(html) {
+  sigFrame.srcdoc = buildSrcdoc(html);
+  sigFrame.hidden = false;
+  sigEmpty.hidden = true;
+}
+function fitFrame() {
+  try {
+    const d = sigFrame.contentDocument;
+    if (!d || !d.body) return;
+    const cs = d.defaultView.getComputedStyle(d.body);
+    const h = Math.max(
+      d.documentElement.getBoundingClientRect().height,
+      d.body.getBoundingClientRect().bottom + (parseFloat(cs.marginBottom) || 0)
+    );
+    sigFrame.style.height = Math.ceil(h) + 2 + 'px';
+  } catch (_) { /* cross-origin or not ready */ }
+}
+sigFrame.addEventListener('load', fitFrame);
+let lastFrameWidth = 0;
+new ResizeObserver(() => {
+  const w = sigFrame.clientWidth;
+  if (w !== lastFrameWidth) { lastFrameWidth = w; fitFrame(); }
+}).observe(sigFrame);
+
+function setHasResult(value) {
+  hasResult = value;
+  tabCode.disabled = !value;
+  copySigBtn.disabled = !value;
+  copyHtmlBtn.disabled = !value;
+  downloadBtn.disabled = !value;
+}
+
+/* ---------- Tabs ---------- */
+function switchTab(name) {
+  const code = name === 'code';
+  tabPreview.setAttribute('aria-selected', String(!code));
+  tabCode.setAttribute('aria-selected', String(code));
+  tabPreview.tabIndex = code ? -1 : 0;
+  tabCode.tabIndex = code ? 0 : -1;
+  panePreview.hidden = code;
+  paneCode.hidden = !code;
+  previewTools.hidden = code;
+  codeTools.hidden = !code;
+  if (code) {
+    if (!isDirty()) editor.setValue(currentHtml, -1);
+    editor.resize();
+    editor.focus();
+  }
+}
+tabPreview.addEventListener('click', () => switchTab('preview'));
+tabCode.addEventListener('click', () => { if (!tabCode.disabled) switchTab('code'); });
+[tabPreview, tabCode].forEach((tab) => tab.addEventListener('keydown', (e) => {
+  if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && !tabCode.disabled) {
+    const goCode = tab === tabPreview;
+    switchTab(goCode ? 'code' : 'preview');
+    (goCode ? tabCode : tabPreview).focus();
+  }
+}));
+
+/* ---------- Preview tools ---------- */
+contextToggle.addEventListener('change', () => { device.dataset.context = contextToggle.checked ? 'on' : 'off'; });
+document.querySelectorAll('.segmented button').forEach((btn) => btn.addEventListener('click', () => {
+  document.querySelectorAll('.segmented button').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+  device.dataset.device = btn.dataset.device;
+}));
+
+/* ---------- Form submission ---------- */
+function readPayload() {
+  const fd = new FormData(form);
+  const v = (k) => String(fd.get(k) ?? '').trim();
+  return {
+    type: v('type'), name: v('name'), image: v('image'), position: v('position'),
+    email: v('email'), calendly: v('calendly'), phone: v('phone')
+  };
+}
+
+async function generate() {
+  const payload = readPayload();
+  hideError();
+  setBusy(true);
+  requestController = new AbortController();
+
+  try {
+    const response = await fetch(WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: requestController.signal
+    });
+
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+
+    const htmlResponse = await response.text();
+    if (!htmlResponse.trim()) throw new Error('EMPTY');
+    if (/ERR_NGROK|You are about to visit/i.test(htmlResponse)) throw new Error('NGROK');
+
+    currentHtml = htmlResponse;
+    edited = false;
+    editor.setValue(currentHtml, -1);
+    setHasResult(true);
+    renderSignature(currentHtml);
+    switchTab('preview');
+    updateDirty();
+    if (window.matchMedia('(max-width: 960px)').matches) {
+      stagePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      toast('Request canceled');
+    } else if (error.message === 'EMPTY') {
+      showError('The service replied with an empty response. Check the n8n workflow, then try again.');
+    } else if (error.message === 'NGROK') {
+      showError('The tunnel returned its browser warning page instead of a signature. Open the webhook link once in a new tab to approve it, then try again.');
+    } else if (error.message.startsWith('HTTP ')) {
+      showError('The service returned an error (' + error.message.slice(5) + '). Check the n8n workflow, then try again.');
+    } else {
+      showError("Couldn't reach the signature service. Check your connection and that the n8n tunnel is running, then try again.");
+    }
+  } finally {
+    requestController = null;
+    setBusy(false);
+  }
+}
+
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (submitBtn.disabled) return;
+  if (!validateAll()) return;
+  if (hasUnsaved()) {
+    confirmAction({
+      title: 'Replace your edits?',
+      text: 'Generating a new signature will overwrite the code edits you made to the current one.',
+      yes: 'Generate anyway',
+      no: 'Keep current'
+    }, generate);
+  } else {
+    generate();
+  }
+});
+retryBtn.addEventListener('click', () => form.requestSubmit());
+cancelRequestBtn.addEventListener('click', () => { if (requestController) requestController.abort(); });
+form.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); form.requestSubmit(); }
+});
+
+resetBtn.addEventListener('click', () => {
+  form.reset();
+  for (const key of Object.keys(rules)) { touched[key] = false; setFieldError(key, ''); }
+  updateFileNamePlaceholder();
+  hideError();
+  $('name').focus();
+});
+$('kbdHint').textContent = (/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl') + ' + Enter to generate';
+
+/* ---------- Editor actions ---------- */
+applyBtn.addEventListener('click', () => {
+  confirmAction({
+    title: 'Apply your edits?',
+    text: 'The preview, copy and download will use your edited code.',
+    yes: 'Apply edits',
+    no: 'Keep editing'
+  }, () => {
+    currentHtml = editor.getValue();
+    edited = true;
+    renderSignature(currentHtml);
+    switchTab('preview');
+    updateDirty();
+    toast('Edits applied');
+  });
+});
+discardBtn.addEventListener('click', () => {
+  confirmAction({
+    title: 'Discard your edits?',
+    text: 'Your unapplied code changes will be lost.',
+    yes: 'Discard edits',
+    no: 'Keep editing',
+    danger: true
+  }, () => {
+    editor.setValue(currentHtml, -1);
+    switchTab('preview');
+    updateDirty();
+    toast('Edits discarded');
+  });
+});
+
+/* ---------- Copy & download ---------- */
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (_) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (__) {}
+    document.body.removeChild(ta);
+    return ok;
+  }
+}
+copyHtmlBtn.addEventListener('click', async () => {
+  toast((await copyText(currentHtml)) ? 'HTML copied' : "Couldn't copy. Select the code and copy it manually.");
+});
+
+copySigBtn.addEventListener('click', async () => {
+  const d = sigFrame.contentDocument;
+  if (!d || !d.body) return;
+  const okMsg = 'Signature copied. Paste it into your email signature settings.';
+  try {
+    if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([d.body.innerHTML], { type: 'text/html' }),
+        'text/plain': new Blob([d.body.innerText], { type: 'text/plain' })
+      })]);
+      toast(okMsg);
+      return;
+    }
+  } catch (_) { /* fall through to selection copy */ }
+  try {
+    const sel = sigFrame.contentWindow.getSelection();
+    const range = d.createRange();
+    range.selectNodeContents(d.body);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    const ok = d.execCommand('copy');
+    sel.removeAllRanges();
+    if (ok) { toast(okMsg); return; }
+  } catch (_) {}
+  toast("Couldn't copy the signature. Try Copy HTML instead.");
+});
+
+function fallbackFileName() {
+  const raw = $('name').value.trim().replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_');
+  return 'signature_' + (raw || 'generated');
+}
+function updateFileNamePlaceholder() { customFileNameInput.placeholder = fallbackFileName(); }
+$('name').addEventListener('input', updateFileNamePlaceholder);
+updateFileNamePlaceholder();
+
+downloadBtn.addEventListener('click', () => {
+  const blob = new Blob([currentHtml], { type: 'text/html' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+
+  let finalName = customFileNameInput.value.trim() || fallbackFileName();
+  if (!finalName.toLowerCase().endsWith('.html')) finalName += '.html';
+  a.download = finalName;
+
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+  toast('Downloaded ' + finalName);
+});
+</script>
+</body>
+</html>
